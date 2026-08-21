@@ -1,0 +1,175 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Office Onboarding — Prototype</title>
+<style>
+  :root {
+    --ink: #0a1b19;
+    --muted: #5c6f6b;
+    --line: #dfe6e0;
+    --panel: #ffffff;
+    --accent: #10c504;
+  }
+  * { box-sizing: border-box; }
+  html, body { height: 100%; margin: 0; }
+  body {
+    background: #eef2ec;
+    color: var(--ink);
+    font: 14px/1.45 "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 24px;
+  }
+
+  .stage { position: relative; line-height: 0; }
+  canvas {
+    display: block;
+    image-rendering: pixelated;
+    border-radius: 10px;
+    box-shadow: 0 12px 40px rgba(10, 27, 25, 0.22);
+    /* 1.5x of the 800x528 backing store — an integer 3x of a map pixel, so it stays crisp */
+    width: 1200px;
+    max-width: 100%;
+    max-height: calc(100vh - 48px);
+    height: auto;
+  }
+
+  /* Overlay lives in viewport coordinates (800x528) and scales with the canvas,
+     so the UI keeps the same proportions at any window size. */
+  .ui {
+    position: absolute;
+    top: 0; left: 0;
+    width: 800px; height: 528px;
+    transform: scale(var(--s, 1));
+    transform-origin: top left;
+    line-height: 1.45;
+  }
+
+  /* ---- panels ---- */
+  .panel {
+    position: absolute;
+    background: var(--panel);
+    border: 1px solid var(--line);
+    border-radius: 10px;
+    box-shadow: 0 6px 20px rgba(10, 27, 25, 0.14);
+    line-height: 1.45;
+  }
+
+  .objective { top: 16px; left: 16px; width: 208px; padding: 14px 16px; }
+  .eyebrow {
+    font-size: 10px;
+    letter-spacing: 0.09em;
+    text-transform: uppercase;
+    color: var(--muted);
+    margin: 0 0 4px;
+  }
+  .objective h1 { font-size: 16px; margin: 0 0 6px; font-weight: 650; }
+  .objective p { margin: 0 0 12px; font-size: 12.5px; color: var(--muted); }
+
+  .obj-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 7px; }
+  .obj-item {
+    display: flex;
+    align-items: center;
+    gap: 9px;
+    font-size: 13px;
+    color: var(--muted);
+    transition: color 0.2s;
+  }
+  .obj-item .mark {
+    width: 16px; height: 16px; flex: none;
+    border: 1.5px solid var(--line);
+    border-radius: 50%;
+    display: grid; place-items: center;
+    font-size: 10px; line-height: 1;
+    color: transparent;
+    transition: all 0.2s;
+  }
+  .obj-item.done { color: var(--ink); }
+  .obj-item.done .mark {
+    background: var(--accent);
+    border-color: var(--accent);
+    color: #fff;
+  }
+  .obj-item.done .label { text-decoration: line-through; text-decoration-color: var(--line); }
+
+  .counter {
+    top: 18px; right: 18px;
+    padding: 10px 16px;
+    display: flex; align-items: center; gap: 9px;
+    font-weight: 650; font-size: 14px;
+  }
+  .coin-dot {
+    width: 14px; height: 14px; border-radius: 50%;
+    background: #f2c62e; border: 2px solid #b8860b;
+  }
+
+  .hint {
+    bottom: 18px; left: 50%; transform: translateX(-50%);
+    padding: 8px 16px;
+    font-size: 12.5px; color: var(--muted);
+    transition: opacity 0.6s;
+  }
+  .hint.faded { opacity: 0; }
+  kbd {
+    font: inherit; font-size: 11px;
+    background: #f3f6f2; border: 1px solid var(--line);
+    border-radius: 4px; padding: 1px 5px; margin: 0 1px;
+  }
+
+  .complete {
+    top: 50%; left: 50%;
+    transform: translate(-50%, -50%) scale(0.94);
+    width: 320px; padding: 26px 28px; text-align: center;
+    opacity: 0; pointer-events: none;
+    transition: opacity 0.3s, transform 0.3s;
+  }
+  .complete.show { opacity: 1; transform: translate(-50%, -50%) scale(1); }
+  .complete h2 { margin: 0 0 8px; font-size: 19px; font-weight: 650; }
+  .complete p { margin: 0; font-size: 13px; color: var(--muted); }
+</style>
+</head>
+<body>
+  <div class="stage">
+    <canvas id="view" width="800" height="528"></canvas>
+
+    <div class="ui" id="ui">
+    <section class="panel objective">
+      <p class="eyebrow">Onboarding</p>
+      <h1>Your first mission</h1>
+      <p>Find and collect the coins hidden around the office.</p>
+      <ul class="obj-list">
+        <li class="obj-item"><span class="mark">✓</span><span class="label">Workspace 1</span></li>
+        <li class="obj-item"><span class="mark">✓</span><span class="label">Workspace 2</span></li>
+        <li class="obj-item"><span class="mark">✓</span><span class="label">Lunch Cafeteria</span></li>
+      </ul>
+    </section>
+
+    <div class="panel counter"><span class="coin-dot"></span>Coins: <span id="count">0/3</span></div>
+
+    <div class="panel hint" id="hint">
+      Use <kbd>←</kbd><kbd>↑</kbd><kbd>↓</kbd><kbd>→</kbd> to walk around the office
+    </div>
+
+    <div class="panel complete" id="complete">
+      <h2>Mission complete! 🎉</h2>
+      <p>You've explored the office and found all the coins.</p>
+    </div>
+    </div>
+  </div>
+
+  <script>
+    // Keep the overlay locked to the canvas's displayed size.
+    const _view = document.getElementById('view');
+    const _ui = document.getElementById('ui');
+    const syncUI = () => {
+      _ui.style.setProperty('--s', _view.clientWidth / 800);
+    };
+    new ResizeObserver(syncUI).observe(_view);
+    syncUI();
+  </script>
+  <script src="map.js"></script>
+  <script src="game.js"></script>
+</body>
+</html>
